@@ -1,0 +1,132 @@
+# Default values for helm-cofares.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+#namespace: default
+
+#Sustituir por el nombre de la aplicacion
+name: keycloak
+image:
+  repository: quay.io/keycloak/keycloak
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "25.0.4"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: false
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+livenessProbe: {}
+  # tcpSocket:
+  #   port: 8080
+  # initialDelaySeconds: 2
+  # periodSeconds: 2
+readinessProbe:
+  httpGet:
+    path: /realms/master
+    port: 8080
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+#si la aplicacion esta configurada de modo que redirija a una url base diferente.
+#Por ejemplo de api.cofares.es/,  a api.cofares.es/docs se debe especificar en el backend config
+backendConfig:
+  enabled: false
+  requestPath: /
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: true
+  className: ""
+  staticIP: ip-keycloack-ingress-pre-v3
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+resources:
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+   limits:
+     cpu: 500m
+     memory: 1000Mi
+   requests:
+     cpu: 500m
+     memory: 1000Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+
+persistence:
+  enabled: true
+  volumes: 
+  - name: volume-keycloak
+    persistentVolumeClaim:
+        claimName: pvc-keycloak-2
+  volumeMounts: 
+  - mountPath: "/opt/keycloak/conf"
+    name: volume-keycloak
+
+#TODO
+#Probar esto
+#TODO ver como no dejar expuesta la password
+args: ["start-dev","--db","postgres","--db-url-host",["proxy.bifarmacias.svc.cluster.local"],"--db-username","postgres","--db-password","$(MY_APP_PASSWORD)","--db-url", "jdbc:postgresql://proxy.bifarmacias.svc.cluster.local:3308/keycloak","--hostname", "https://kcpre.cofares.es","--hostname-backchannel-dynamic","true"]
+env:
+  - name: KEYCLOAK_ADMIN
+    value: "admin"
+  - name: KEYCLOAK_ADMIN_PASSWORD
+    value: "admin"
+  - name: KC_PROXY
+    value: "passthrough"
+  - name: MY_APP_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: secret-db
+        key: password
+envFrom:
+#  - secretRef:
+#      name: [nombre del secret]
+
+proxySql:
+  enabled: false
+  #instancia de la base de datos Ej: tedifarma-farmanager-cal:europe-west1:gceuw1farmadb01d=tcp:3306
+  instance:  
+  # cuenta de servicio de google codificada en base64 que brinda acceso a la instancia de mysql del proyecto.
+  # Por seguridad NO se recomienda poner este valor en el fichero values.yaml, en su lugar pasarla como parametro
+  #del comando helm o como parametro en argocd o en jenkins
+  mySqlGoogleServiceAccount: 
+  #Por seguridad (para entornos productivos) no se debe poner estos valores directamente en el fichero,
+  #, en su lugar pasarla como parametros del comando helm o como parametro en argocd o en jenkin
+  db_password: 
+  db_user: 
+  port: 5432
